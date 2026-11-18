@@ -24,6 +24,10 @@ uint8_t accel_data[6]={0};
 uint8_t X_gyro_reg=0x43;
 uint8_t gyro_data[6]={};
 
+float X_bias = 0.0f;
+float Y_bias = 0.0f;
+float Z_bias = 0.0f;
+
 //WAKING MPU UP
 uint8_t pwr_mgmt_data[2]={0x6B,0x01};
 
@@ -59,6 +63,26 @@ void app_main(void)
 	ESP_ERROR_CHECK(i2c_master_transmit_receive(dev_handle, &gyro_config_reg,1, &gyro_config_data,1,-1));
     printf("GYRO CONFIG: 0x%02X\n", gyro_config_data);
     
+    //FOR GYRO CALIBRATION
+    for(int i=0; i<100; i++){
+		ESP_ERROR_CHECK(i2c_master_transmit_receive(dev_handle, &X_gyro_reg,1,gyro_data,6,-1));
+		int16_t X_raw = (gyro_data[0] << 8) | gyro_data[1];
+		int16_t Y_raw = (gyro_data[2] << 8) | gyro_data[3];
+		int16_t Z_raw = (gyro_data[4] << 8) | gyro_data[5];
+
+		float X_gyro_cal = (float)X_raw / 131.0f;
+		float Y_gyro_cal = (float)Y_raw / 131.0f;
+		float Z_gyro_cal = (float)Z_raw / 131.0f;
+        X_bias+=X_gyro_cal;
+        Y_bias+=Y_gyro_cal;
+		Z_bias+=Z_gyro_cal;
+		usleep(10000);
+	}
+		float cal_x= X_bias/100;
+		float cal_y= Y_bias/100;
+		float cal_z= Z_bias/100;
+		
+		    
     while (true) {
 		//FOR READING XYZ RAW ACCEL
 		ESP_ERROR_CHECK(i2c_master_transmit_receive(dev_handle, &X_accel_reg,1,accel_data,6,-1));
@@ -78,12 +102,13 @@ void app_main(void)
         int16_t Z_gyro_raw=(gyro_data[4]<<8) | gyro_data[5];
         
         // /s GYRO FOR XYZ AXIS
-        float X_gyro_dps=(float)X_gyro_raw/131.0f;
-        float Y_gyro_dps=(float)Y_gyro_raw/131.0f;
-        float Z_gyro_dps=(float)Z_gyro_raw/131.0f;
+        float X_gyro_dps=((float)X_gyro_raw/131.0f);
+        float Y_gyro_dps=((float)Y_gyro_raw/131.0f);
+        float Z_gyro_dps=((float)Z_gyro_raw/131.0f);
         
         
-        printf(" ACCEL X: %.3f g |, Y:%.3f g |, Z:%.3f g\n",X_accel_g,Y_accel_g,Z_accel_g);
+        printf(" ACCEL X: %.3f g |, Y:%.3f g |, Z:%.3f g\n\n",X_accel_g,Y_accel_g,Z_accel_g);
+        printf("Bias X: %f |, Bias Y:%f, | Bias Z:%f\n\n",X_bias,Y_bias,Z_bias);
         printf(" GYRO X: %.3f s|, Y:%.3f s |, Z:%.3f s\n",X_gyro_dps,Y_gyro_dps,Z_gyro_dps);
         
         
