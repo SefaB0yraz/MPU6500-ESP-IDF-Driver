@@ -1,3 +1,4 @@
+#include <cmath>
 #include <cstddef>
 #include <stdint.h>
 #include <stdio.h>
@@ -10,6 +11,8 @@
 #include "hal/i2c_types.h"
 #include "soc/clk_tree_defs.h"
 #include "soc/gpio_num.h"
+#include "esp_timer.h"
+#include <math.h>
 
 extern "C" void app_main(void);
 
@@ -24,9 +27,18 @@ uint8_t accel_data[6]={0};
 uint8_t X_gyro_reg=0x43;
 uint8_t gyro_data[6]={};
 
+
 float X_bias = 0.0f;
 float Y_bias = 0.0f;
 float Z_bias = 0.0f;
+
+float X_angle=0.0f;
+float Y_angle=0.0f;
+float Z_angle=0.0f;
+float roll_filtered=0;
+float pitch_filtered=0;
+
+bool filter_initialized = false;
 
 //WAKING MPU UP
 uint8_t pwr_mgmt_data[2]={0x6B,0x01};
@@ -47,7 +59,7 @@ void app_main(void)
     
     i2c_device_config_t dev_config={};
     dev_config.dev_addr_length=I2C_ADDR_BIT_LEN_7;
-    dev_config.scl_speed_hz=100000;
+    dev_config.scl_speed_hz=50000;
     dev_config.device_address=0x68;
     
     i2c_master_dev_handle_t dev_handle;
@@ -82,8 +94,12 @@ void app_main(void)
 		float cal_y= Y_bias/100;
 		float cal_z= Z_bias/100;
 		
-		    
+	int64_t previous_time=esp_timer_get_time();
     while (true) {
+		int64_t now=esp_timer_get_time();
+		float dt=(now-previous_time)/1000000.0f;
+		previous_time=now;
+		printf("DT: %.6f s\n", dt);
 		//FOR READING XYZ RAW ACCEL
 		ESP_ERROR_CHECK(i2c_master_transmit_receive(dev_handle, &X_accel_reg,1,accel_data,6,-1));
 		int16_t X_accel_raw = (accel_data[0] << 8) | accel_data[1];
@@ -102,16 +118,36 @@ void app_main(void)
         int16_t Z_gyro_raw=(gyro_data[4]<<8) | gyro_data[5];
         
         // /s GYRO FOR XYZ AXIS
-        float X_gyro_dps=((float)X_gyro_raw/131.0f);
-        float Y_gyro_dps=((float)Y_gyro_raw/131.0f);
-        float Z_gyro_dps=((float)Z_gyro_raw/131.0f);
+        float X_gyro_dps=((float)X_gyro_raw/131.0f)-cal_x;
+        float Y_gyro_dps=((float)Y_gyro_raw/131.0f)-cal_y;
+        float Z_gyro_dps=((float)Z_gyro_raw/131.0f)-cal_z;
         
+        // FOR ANGLE CALCULATION
+        X_angle+=X_gyro_dps*dt;
+        Y_angle+=Y_gyro_dps*dt;
+        Z_angle+=Z_gyro_dps*dt;
+        float roll=atan2(Y_accel_g,Z_accel_g);//RAD
+        float pitch=atan2(-X_accel_g, sqrt((Y_accel_g*Y_accel_g)+(Z_accel_g*Z_accel_g)));//RAD
+        roll = roll * 180.0f / M_PI;//DEG
+        pitch= pitch * 180.0f / M_PI;//DEG
         
-        printf(" ACCEL X: %.3f g |, Y:%.3f g |, Z:%.3f g\n\n",X_accel_g,Y_accel_g,Z_accel_g);
-        printf("Bias X: %f |, Bias Y:%f, | Bias Z:%f\n\n",X_bias,Y_bias,Z_bias);
-        printf(" GYRO X: %.3f s|, Y:%.3f s |, Z:%.3f s\n",X_gyro_dps,Y_gyro_dps,Z_gyro_dps);
+        if(!filter_initialized){
+			roll_filtered= roll;
+			pitch_filtered= pitch;
+			filter_initialized=true;
+		}
+        else{
+        // COMPLEMENTARY FILTER
+        roll_filtered=0.98 * ((roll_filtered) + (X_gyro_dps*dt)) + (1-0.98) *roll;
+        pitch_filtered = 0.98f * (pitch_filtered + Y_gyro_dps * dt) + (1-0.98) * pitch;
+        }
         
+        //printf(" ACCEL X: %.3f g |, Y:%.3f g |, Z:%.3f g\n\n",X_accel_g,Y_accel_g,Z_accel_g);
+        //printf("Bias X: %f |, Bias Y:%f, | Bias Z:%f\n\n",X_bias,Y_bias,Z_bias);
+        //printf(" GYRO X: %.3f s|, Y:%.3f s |, Z:%.3f s\n",X_gyro_dps,Y_gyro_dps,Z_gyro_dps);
+        printf("ROLL FILTERED: %f | PITCH FILTERED: %f | Z Angle: %f",roll_filtered,pitch_filtered,Z_angle);
         
-        sleep(1);
+        usleep(40000);
+        
     }
 }
