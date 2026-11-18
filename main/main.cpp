@@ -14,11 +14,15 @@
 extern "C" void app_main(void);
 
 uint8_t pwr_mgmt_reg=0x6B;
+uint8_t accel_confi_reg=0x1C;
+uint8_t accel_confi_data=0;
+uint8_t gyro_config_reg=0x1B;
+uint8_t gyro_config_data=0;
 uint8_t data=0;
-uint8_t X_accel_data[2]={0};
-uint8_t X_reg=0x3B;
-uint8_t Y_accel_data[2]={};
-uint8_t Y_reg=0x3D;
+uint8_t X_accel_reg=0x3B;
+uint8_t accel_data[6]={0};
+uint8_t X_gyro_reg=0x43;
+uint8_t gyro_data[6]={};
 
 //WAKING MPU UP
 uint8_t pwr_mgmt_data[2]={0x6B,0x01};
@@ -49,17 +53,39 @@ void app_main(void)
     ESP_ERROR_CHECK(i2c_master_transmit(dev_handle,pwr_mgmt_data,2,-1));
     //FOR PWR_MGMT_1
     ESP_ERROR_CHECK(i2c_master_transmit_receive(dev_handle, &pwr_mgmt_reg,1,&data,1,-1));
-    
-    
+    //FOR READING ACCEL_CONFIG BITS
+    ESP_ERROR_CHECK(i2c_master_transmit_receive(dev_handle,&accel_confi_reg,1,&accel_confi_data,1,-1));
+	printf("ACCEL_CONFIG: 0x%02X\n", accel_confi_data);
+	ESP_ERROR_CHECK(i2c_master_transmit_receive(dev_handle, &gyro_config_reg,1, &gyro_config_data,1,-1));
+    printf("GYRO CONFIG: 0x%02X\n", gyro_config_data);
     
     while (true) {
-		//FOR READING X ACCEL
-		ESP_ERROR_CHECK(i2c_master_transmit_receive(dev_handle, &X_reg,1,X_accel_data,2,-1));
-		int16_t X_accel = (X_accel_data[0] << 8) | X_accel_data[1];
-		printf("X Accel Raw: %d\n", X_accel);
-        ESP_ERROR_CHECK(i2c_master_transmit_receive(dev_handle, &X_reg,1, X_accel_data,2,-1));
-        int16_t Y_accel=(X_accel_data[0]<<8) | X_accel_data[1];
-        printf("Y Accel Raw: %d",Y_accel);
+		//FOR READING XYZ RAW ACCEL
+		ESP_ERROR_CHECK(i2c_master_transmit_receive(dev_handle, &X_accel_reg,1,accel_data,6,-1));
+		int16_t X_accel_raw = (accel_data[0] << 8) | accel_data[1];
+		int16_t Y_accel_raw=(accel_data[2]<<8) | accel_data[3];
+        int16_t Z_accel_raw=(accel_data[4]<<8) | accel_data[5];
+        
+        //G ACCEL FOR XYZ AXIS
+        float X_accel_g=(float)X_accel_raw/16384.0f;
+        float Y_accel_g=(float)Y_accel_raw/16384.0f;
+        float Z_accel_g=(float)Z_accel_raw/16384.0f;
+        
+        //FOR READING XYZ RAW GYRO
+        ESP_ERROR_CHECK(i2c_master_transmit_receive(dev_handle, &X_gyro_reg,1,gyro_data, 6,-1));
+        int16_t X_gyro_raw=(gyro_data[0]<<8) | gyro_data[1];
+        int16_t Y_gyro_raw=(gyro_data[2]<<8) | gyro_data[3];
+        int16_t Z_gyro_raw=(gyro_data[4]<<8) | gyro_data[5];
+        
+        // /s GYRO FOR XYZ AXIS
+        float X_gyro_dps=(float)X_gyro_raw/131.0f;
+        float Y_gyro_dps=(float)Y_gyro_raw/131.0f;
+        float Z_gyro_dps=(float)Z_gyro_raw/131.0f;
+        
+        
+        printf(" ACCEL X: %.3f g |, Y:%.3f g |, Z:%.3f g\n",X_accel_g,Y_accel_g,Z_accel_g);
+        printf(" GYRO X: %.3f s|, Y:%.3f s |, Z:%.3f s\n",X_gyro_dps,Y_gyro_dps,Z_gyro_dps);
+        
         
         sleep(1);
     }
