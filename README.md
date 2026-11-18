@@ -1,75 +1,84 @@
 # MPU6500 ESP-IDF Driver
 
-A C++ driver for the MPU6500 6-axis motion tracking sensor, developed from scratch using ESP-IDF.
+**A learning-focused MPU6500 sensor driver implementation using C++, ESP-IDF and ESP32.**
 
-This project aims to establish low-level I2C communication with the MPU6500 and implement sensor data acquisition, configuration, and processing without relying on ready-made sensor libraries.
+This project is a hands-on learning exercise focused on understanding low-level sensor communication, register configuration, data acquisition and basic orientation estimation.
+
+The goal is to develop my own understanding of sensor drivers and build a reusable foundation for future embedded systems projects.
 
 ## Hardware
 
-- **Microcontroller:** ESP32
-- **Sensor:** MPU6500 (6-axis accelerometer and gyroscope)
-- **Development Framework:** ESP-IDF
-- **Programming Language:** C++
+- ESP32
+- MPU6500 6-axis IMU
+  - 3-axis accelerometer
+  - 3-axis gyroscope
 
-## Communication
+## Development Environment
 
-The sensor communicates with the ESP32 over I2C.
+- Language: C++
+- Framework: ESP-IDF v5.3.1
+- Communication Protocol: I2C
 
-| Connection | ESP32 GPIO |
+## Implemented Features
+
+- [x] I2C master initialization using ESP-IDF
+- [x] MPU6500 device initialization and wake-up
+- [x] Register configuration and reading
+- [x] 3-axis accelerometer data acquisition
+- [x] 3-axis gyroscope data acquisition
+- [x] Raw sensor data conversion into physical units
+- [x] Gyroscope bias calibration
+- [x] Angular velocity integration for angle estimation
+- [x] Accelerometer-based roll and pitch estimation
+- [x] Complementary filter implementation
+- [ ] Physical validation and refinement of orientation estimation
+- [ ] Refactoring into a modular C++ driver structure
+- [ ] FreeRTOS integration
+
+## Sensor Configuration
+
+Current configuration:
+
+| Parameter | Configuration |
 |---|---|
-| SDA | GPIO 21 |
-| SCL | GPIO 22 |
-| VCC | 3.3V |
-| GND | GND |
+| I2C Address | 0x68 |
+| I2C Clock | 50 kHz |
+| Accelerometer Range | ±2g |
+| Gyroscope Range | ±250 °/s |
+| Accelerometer Sensitivity | 16384 LSB/g |
+| Gyroscope Sensitivity | 131 LSB/(°/s) |
 
-- I2C Address: `0x68`
-- Bus Speed: `100 kHz`
+## Orientation Estimation
 
-## Current Progress
+The implementation uses both accelerometer and gyroscope measurements.
 
-- [x] ESP-IDF project setup
-- [x] I2C master initialization
-- [x] MPU6500 device communication
-- [x] WHO_AM_I register verification
-- [x] PWR_MGMT_1 register configuration
-- [x] Accelerometer X-axis raw data acquisition
-- [ ] Three-axis accelerometer data acquisition
-- [ ] Accelerometer configuration
-- [ ] Raw data conversion to physical units (g)
-- [ ] Gyroscope data acquisition
-- [ ] Sensor initialization and read functions
-- [ ] Error handling improvements
-- [ ] FreeRTOS task integration
+**Gyroscope:**
+- Measures angular velocity.
+- Bias calibration is performed at startup.
+- Angular velocity is integrated over time to estimate angular displacement.
 
-## Project Structure
+**Accelerometer:**
+- Raw measurements are converted into g.
+- Roll and pitch are estimated using trigonometric calculations.
 
-```text
-MPU6500-ESP-IDF-Driver/
-├── main/
-│   └── main.cpp
-├── CMakeLists.txt
-├── README.md
-└── LICENSE
-```
+**Complementary Filter:**
 
-## Development Goals
+A complementary filter combines gyroscope integration with accelerometer-based angle estimation to obtain a more stable roll and pitch estimate.
 
-The main goal is to develop a reusable and modular sensor driver while gaining practical experience in:
+The filter is currently implemented and undergoing physical validation.
 
-- Embedded C++ programming
-- I2C communication protocols
-- Register-level sensor control
-- ESP-IDF peripheral APIs
-- Real-time operating systems (FreeRTOS)
+## Current Development Status
 
-## Status
+The sensor communication, data acquisition, calibration and basic orientation estimation pipeline are implemented.
 
-**Work in Progress**
+The next development stage focuses on validating the angle estimation, improving the software structure and integrating FreeRTOS for more structured sensor data acquisition.
 
-This project is actively being developed. Features will be implemented and documented incrementally.
+## Project Motivation
 
-## Author
+Rather than relying entirely on ready-made sensor libraries, I wanted to understand how an IMU communicates with a microcontroller and how raw sensor measurements can be processed into meaningful physical quantities.
 
-Sefa Boyraz
+This project is part of my learning journey in embedded software development, with a particular interest in aerospace and control systems.
 
-GitHub: [SefaB0yraz](https://github.com/SefaB0yraz)
+---
+
+**Technologies:** C++ · ESP-IDF · ESP32 · MPU6500 · I2C · Sensor Fusion
